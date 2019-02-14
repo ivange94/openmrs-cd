@@ -5,28 +5,28 @@
  *
  */
 
-const fs = require("fs");
-const path = require("path");
-const _ = require("lodash");
-const log = require("npmlog");
+ const fs = require("fs");
+ const path = require("path");
+ const _ = require("lodash");
+ const log = require("npmlog");
 
-const utils = require("../utils/utils");
-const model = require("../utils/model");
-const cst = require("../const");
-const config = require(cst.CONFIGPATH);
-const db = require(cst.DBPATH);
+ const utils = require("../utils/utils");
+ const model = require("../utils/model");
+ const cst = require("../const");
+ const config = require(cst.CONFIGPATH);
+ const db = require(cst.DBPATH);
 
-const scripts = require("./scripts");
+ const scripts = require("./scripts");
 
-const currentStage = config.getHostPrepareStatusCode();
+ const currentStage = config.getHostPrepareStatusCode();
 
 //
 //  Fetching the instance definition based on the provided UUID
 //
-var instanceDef = db.getInstanceDefinition(
+ var instanceDef = db.getInstanceDefinition(
   process.env[config.varInstanceUuid()]
-);
-if (_.isEmpty(instanceDef)) {
+  );
+ if (_.isEmpty(instanceDef)) {
   throw new Error("Illegal argument: empty or unexisting instance definition.");
 }
 
@@ -53,7 +53,7 @@ if (process.env[config.varArtifactsChanges()] === "true") {
   var hostArtifactsDir = hostDir + "/artifacts";
   script.body.push(
     scripts.remote(ssh, scripts.initFolder(hostArtifactsDir, ssh.user), true)
-  );
+    );
   Object.assign(ssh, { remoteDst: true });
   script.body.push(
     scripts.rsync(
@@ -61,18 +61,35 @@ if (process.env[config.varArtifactsChanges()] === "true") {
       config.getCDArtifactsDirPath(instanceDef.uuid),
       hostArtifactsDir,
       true
-    )
-  );
+      )
+    );
 }
 
 // 'deployment'
 
 if (process.env[config.varDeploymentChanges()] === "true") {
+  var container = scripts[instanceDef.deployment.type]
   var docker = instanceDef.deployment.value;
   // TODO: most likely a `docker login` here
   script.body.push(
     scripts.remote(ssh, "docker pull " + docker.image + ":" + docker.tag + "\n")
-  );
+    );
+  // Configure proxy servers
+  var proxies = instanceDef.deployment.proxies;
+  if (!_.isEmpty(proxies)) { 
+    proxies.forEach(function(proxy) {
+      script.body.push(
+        scripts.remote(
+          ssh,
+          scripts[proxy.type].createProxy(
+            proxy.value,
+           instanceDef.deployment.maintenanceUrl,
+           instanceDef.deployment.selinux
+           )
+          )
+        );
+    })
+  }
 }
 
 // 'data'
@@ -89,10 +106,10 @@ if (process.env[config.varDataChanges()] === "true") {
           log.error(
             "",
             "Source instance definition could not be found. Instance can not use data of non-existing instance."
-          );
+            );
           throw new Error(
             "Illegal argument: empty or unexisting instance definition."
-          );
+            );
         }
         sourceDataDir = sourceInstance.deployment.hostDir + "/data/";
       }
@@ -110,9 +127,9 @@ if (process.env[config.varDataChanges()] === "true") {
             null,
             null,
             true
+            )
           )
-        )
-      );
+        );
     }
   });
 }
@@ -123,7 +140,7 @@ script.body = scripts.computeAdditionalScripts(
   currentStage,
   config,
   process.env
-).script;
+  ).script;
 
 script.body = script.body.join(cst.SCRIPT_SEPARATOR);
 
@@ -133,14 +150,14 @@ script.body = script.body.join(cst.SCRIPT_SEPARATOR);
 fs.writeFileSync(
   path.resolve(config.getBuildDirPath(), config.getHostPrepareScriptName()),
   utils.getScriptAsString(script)
-);
+  );
 fs.chmodSync(
   path.resolve(config.getBuildDirPath(), config.getHostPrepareScriptName()),
   "0755"
-);
+  );
 
 // Saving the status
 fs.writeFileSync(
   path.resolve(config.getBuildDirPath(), config.getStatusFileName()),
   JSON.stringify({ status: currentStage })
-);
+  );

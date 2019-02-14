@@ -21,7 +21,7 @@ describe("Host preparation scripts", function() {
     config = tests.config();
     scripts = require(path.resolve(
       "src/" + config.getJobNameForPipeline3() + "/scripts"
-    ));
+      ));
     db = proxyquire(path.resolve("src/utils/db"), stubs);
 
     process.env[config.varArtifactsChanges()] = "false";
@@ -44,15 +44,15 @@ describe("Host preparation scripts", function() {
     proxyquire(
       path.resolve(
         "src/" + config.getJobNameForPipeline3() + "/host-preparation.js"
-      ),
+        ),
       tests.stubs()
-    );
+      );
 
     // verif
     var script = fs.readFileSync(
       path.resolve(config.getBuildDirPath(), config.getHostPrepareScriptName()),
       "utf8"
-    );
+      );
     var hostArtifactsDir = instanceDef.deployment.hostDir + "/artifacts";
     expect(script).toContain("mkdir -p " + hostArtifactsDir);
     var srcDir = process.env.WORKSPACE + "/" + instanceUuid + "/artifacts/";
@@ -72,18 +72,28 @@ describe("Host preparation scripts", function() {
     proxyquire(
       path.resolve(
         "src/" + config.getJobNameForPipeline3() + "/host-preparation.js"
-      ),
+        ),
       tests.stubs()
-    );
+      );
 
     // verif
     var script = fs.readFileSync(
       path.resolve(config.getBuildDirPath(), config.getHostPrepareScriptName()),
       "utf8"
-    );
+      );
     expect(script).toContain(
       "docker pull mekomsolutions/bahmni:cambodia-release-0.90"
-    );
+      );
+
+    // ensure proxies have been setup
+    var proxy = instanceDef.deployment.proxies[0];
+    expect(script).toContain(
+      scripts["dockerApacheMacro"].createProxy(
+        proxy.value,
+       instanceDef.deployment.maintenanceUrl,
+       instanceDef.deployment.selinux
+       )
+      );
   });
 
   it("should generate bash script upon data changes.", function() {
@@ -95,26 +105,26 @@ describe("Host preparation scripts", function() {
     proxyquire(
       path.resolve(
         "src/" + config.getJobNameForPipeline3() + "/host-preparation.js"
-      ),
+        ),
       tests.stubs()
-    );
+      );
 
     // verif
     var script = fs.readFileSync(
       path.resolve(config.getBuildDirPath(), config.getHostPrepareScriptName()),
       "utf8"
-    );
+      );
     var hostDataDir = instanceDef.deployment.hostDir + "/data";
     var ssh = instanceDef.deployment.host.value;
     var srcDir =
-      "/var/docker-volumes/50b6cf72-0e80-457d-8141-a0c8c85d4dae/data/";
+    "/var/docker-volumes/50b6cf72-0e80-457d-8141-a0c8c85d4dae/data/";
 
     expect(script).toContain(
       scripts.remote(
         ssh,
         scripts.rsync(ssh, srcDir, hostDataDir, true, false, "", true)
-      )
-    );
+        )
+      );
   });
   it("should fail when instance to copy is non-existing.", function() {
     process.env[config.varInstanceUuid()] = instanceUuid;
@@ -125,9 +135,9 @@ describe("Host preparation scripts", function() {
     proxyquire(
       path.resolve(
         "src/" + config.getJobNameForPipeline3() + "/host-preparation.js"
-      ),
+        ),
       tests.stubs()
-    );
+      );
 
     instanceDef.data[0].value.uuid = "non-exsiting-instance-uuid";
     db.saveInstanceDefinition(instanceDef, instanceUuid);
@@ -137,11 +147,11 @@ describe("Host preparation scripts", function() {
       proxyquire(
         path.resolve(
           "src/" + config.getJobNameForPipeline3() + "/host-preparation.js"
-        ),
+          ),
         tests.stubs()
-      );
+        );
     }).toThrow(
-      new Error("Illegal argument: empty or unexisting instance definition.")
+    new Error("Illegal argument: empty or unexisting instance definition.")
     );
   });
 });

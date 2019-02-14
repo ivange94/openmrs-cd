@@ -4,27 +4,27 @@
  *
  */
 
-const fs = require("fs");
-const path = require("path");
-const _ = require("lodash");
+ const fs = require("fs");
+ const path = require("path");
+ const _ = require("lodash");
 
-const utils = require("../utils/utils");
-const model = require("../utils/model");
-const cst = require("../const");
-const config = require(cst.CONFIGPATH);
-const db = require(cst.DBPATH);
+ const utils = require("../utils/utils");
+ const model = require("../utils/model");
+ const cst = require("../const");
+ const config = require(cst.CONFIGPATH);
+ const db = require(cst.DBPATH);
 
-const scripts = require("./scripts");
+ const scripts = require("./scripts");
 
-const currentStage = config.getStartInstanceStatusCode();
+ const currentStage = config.getStartInstanceStatusCode();
 
 //
 //  Fetching the instance definition based on the provided UUID
 //
-var instanceDef = db.getInstanceDefinition(
+ var instanceDef = db.getInstanceDefinition(
   process.env[config.varInstanceUuid()]
-);
-if (_.isEmpty(instanceDef)) {
+  );
+ if (_.isEmpty(instanceDef)) {
   throw new Error("Illegal argument: empty or unexisting instance definition.");
 }
 
@@ -54,7 +54,7 @@ if (process.env[config.varArtifactsChanges()] === "true") {
 }
 
 // 'deployment'
-var container = scripts.getDeploymentScripts(instanceDef.deployment.type);
+var container = scripts[instanceDef.deployment.type];
 
 if (process.env[config.varDeploymentChanges()] === "true") {
   script.body.push(scripts.remote(ssh, container.remove(instanceDef.uuid)));
@@ -68,7 +68,7 @@ if (process.env[config.varDeploymentChanges()] === "true") {
     var tls = instanceDef.deployment.tls;
     if (tls.type === "file") {
       mounts[
-        scripts.trailSlash(tls.value.keysFolder, false)
+      scripts.trailSlash(tls.value.keysFolder, false)
       ] = scripts.trailSlash(tls.value.hostKeysFolder, false);
     }
     setTLS += scripts.remote(
@@ -76,39 +76,41 @@ if (process.env[config.varDeploymentChanges()] === "true") {
       container.exec(
         instanceDef.uuid,
         scripts.logInfo("Configuring TLS certs") +
-          tls.value.webServerUpdateScript +
-          " " +
-          tls.value.webServerConfFile +
-          " " +
-          scripts.trailSlash(tls.value.keysFolder, true) +
-          tls.value.privateKeyFilename +
-          " " +
-          scripts.trailSlash(tls.value.keysFolder, true) +
-          tls.value.publicCertFilename +
-          " " +
-          scripts.trailSlash(tls.value.keysFolder, true) +
-          tls.value.chainCertsFilename
-      )
-    );
+        tls.value.webServerUpdateScript +
+        " " +
+        tls.value.webServerConfFile +
+        " " +
+        scripts.trailSlash(tls.value.keysFolder, true) +
+        tls.value.privateKeyFilename +
+        " " +
+        scripts.trailSlash(tls.value.keysFolder, true) +
+        tls.value.publicCertFilename +
+        " " +
+        scripts.trailSlash(tls.value.keysFolder, true) +
+        tls.value.chainCertsFilename
+        )
+      );
   }
   script.body.push(
     scripts.remote(ssh, container.run(instanceDef.uuid, instanceDef, mounts))
-  );
+    );
   script.body.push(setTLS);
 }
 
 // Link mounted folders based on the components to link
-script.body.push(
-  scripts.remote(
-    ssh,
-    container.exec(
-      instanceDef.uuid,
-      scripts.linkComponents(instanceDef.deployment.links)
-    )
-  )
-);
-// Restart after linking folders
-script.body.push(scripts.remote(ssh, container.restart(instanceDef.uuid)));
+if (!_.isEmpty(instanceDef.deployment.links)) { 
+  script.body.push(
+    scripts.remote(
+      ssh,
+      container.exec(
+        instanceDef.uuid,
+        scripts.linkComponents(instanceDef.deployment.links)
+        )
+      )
+    );
+  // Restart after linking folders
+  script.body.push(scripts.remote(ssh, container.restart(instanceDef.uuid)));
+}
 
 // 'data'
 if (process.env[config.varDataChanges()] === "true") {
@@ -121,19 +123,19 @@ if (process.env[config.varDataChanges()] === "true") {
       sql: function() {
         var sql = data.value;
         var randomFolderName = utils
-          .random()
-          .toString(36)
-          .slice(-5);
+        .random()
+        .toString(36)
+        .slice(-5);
         var destFolder = "/tmp/" + randomFolderName + "/";
         Object.assign(ssh, { remoteDst: false, remoteSrc: false });
         script.body.push(
           scripts.remote(
             ssh,
             container.exec(instanceDef.uuid, "mkdir -p " + destFolder) +
-              "\n" +
-              container.copy(instanceDef.uuid, sql.sourceFile, destFolder)
-          )
-        );
+            "\n" +
+            container.copy(instanceDef.uuid, sql.sourceFile, destFolder)
+            )
+          );
 
         var sqlCmd = "";
         var waitForMySQL = "";
@@ -148,10 +150,10 @@ if (process.env[config.varDataChanges()] === "true") {
                     destFolder,
                     path.basename(sql.sourceFile),
                     sql
+                    )
                   )
                 )
-              )
-            );
+              );
           },
           bahmni: function() {
             script.body.push(
@@ -163,10 +165,10 @@ if (process.env[config.varDataChanges()] === "true") {
                     destFolder,
                     path.basename(sql.sourceFile),
                     sql
+                    )
                   )
                 )
-              )
-            );
+              );
           }
         };
         applyEngine[sql.engine]();
@@ -184,9 +186,9 @@ if (instanceDef.deployment.timezone) {
       container.exec(
         instanceDef.uuid,
         scripts.setTimezone(instanceDef.deployment.timezone)
+        )
       )
-    )
-  );
+    );
 }
 
 var computedScript = scripts.computeAdditionalScripts(
@@ -195,7 +197,7 @@ var computedScript = scripts.computeAdditionalScripts(
   currentStage,
   config,
   process.env
-);
+  );
 script.body = computedScript.script;
 
 finalRestart += computedScript.restartNeeded;
@@ -212,14 +214,14 @@ script.body = script.body.join(cst.SCRIPT_SEPARATOR);
 fs.writeFileSync(
   path.resolve(config.getBuildDirPath(), config.getStartInstanceScriptName()),
   utils.getScriptAsString(script)
-);
+  );
 fs.chmodSync(
   path.resolve(config.getBuildDirPath(), config.getStartInstanceScriptName()),
   "0755"
-);
+  );
 
 // Saving the status
 fs.writeFileSync(
   path.resolve(config.getBuildDirPath(), config.getStatusFileName()),
   JSON.stringify({ status: currentStage })
-);
+  );
